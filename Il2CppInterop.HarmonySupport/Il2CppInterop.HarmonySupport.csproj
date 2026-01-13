@@ -2,12 +2,12 @@
 
   <PropertyGroup>
     <Description>Module to allow using Harmony with Il2CppInterop assemblies</Description>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Il2CppInterop.HarmonySupport</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HarmonyX" Version="2.10.0"/>
+    <PackageReference Include="HarmonyX" Version="2.16.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 using MonoMod.Cil;
 using MonoMod.RuntimeDetour;
 using MonoMod.Utils;
-using Detour = MonoMod.RuntimeDetour.Detour;
+using Hook = MonoMod.RuntimeDetour.Hook;
 using IDetour = Il2CppInterop.Runtime.Injection.IDetour;
 using ValueType = Il2CppSystem.ValueType;
 
@@ -68,7 +68,7 @@ internal unsafe class Il2CppDetourMethodPatcher : MethodPatcher
     private INativeMethodInfoStruct originalNativeMethodInfo;
 
     /// <summary>
-    ///     Constructs a new instance of <see cref="MonoMod.RuntimeDetour.NativeDetour" /> method patcher.
+    ///     Constructs a new instance of <see cref="MonoMod.RuntimeDetour.Hook" /> method patcher.
     /// </summary>
     /// <param name="original"></param>
     public Il2CppDetourMethodPatcher(MethodBase original) : base(original) => Init();
@@ -151,9 +151,9 @@ internal unsafe class Il2CppDetourMethodPatcher : MethodPatcher
         nativeDetour.Apply();
         modifiedNativeMethodInfo.MethodPointer = nativeDetour.OriginalTrampoline;
 
-        var detour = new Detour(Original, managedHookedMethod);
-        detour.Apply();
-        DetourCache.Add(detour);
+        var hook = new Hook(Original, managedHookedMethod);
+        hook.Apply();
+        DetourCache.Add(hook);
 
         return managedHookedMethod;
     }
