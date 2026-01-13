@@ -6,8 +6,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>il2cppinterop</ToolCommandName>
     <PackageOutputPath>../bin/NuGet</PackageOutputPath>
-    <PackageId>Il2CppInterop.CLI</PackageId>
-    <Authors>BepInEx</Authors>
+    <PackageId>EnoPM.Il2CppInterop.CLI</PackageId>
     <Description>CLI tool for generating managed proxy assemblies for Il2Cpp</Description>
     <Configurations>Debug;Release</Configurations>
     <Platforms>AnyCPU</Platforms>

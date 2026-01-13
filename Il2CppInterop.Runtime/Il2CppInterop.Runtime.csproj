@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>Il2CppInterop.Runtime</PackageId>
-    <Authors>knah, BepInEx et al.</Authors>
+    <PackageId>EnoPM.Il2CppInterop.Runtime</PackageId>
     <Description>Runtime tools for bridging .NET and Il2Cpp together</Description>
     <TargetFramework>net10.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

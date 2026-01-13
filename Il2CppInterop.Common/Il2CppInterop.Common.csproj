@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Authors>BepInEx, knah et al.</Authors>
+    <PackageId>EnoPM.Il2CppInterop.Common</PackageId>
     <Description>Common API for Il2CppInterop packages</Description>
     <RootNamespace>Il2CppInterop.Common</RootNamespace>
   </PropertyGroup>

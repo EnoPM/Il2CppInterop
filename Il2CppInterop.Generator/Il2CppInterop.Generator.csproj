@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>Il2CppInterop.Generator</PackageId>
-    <Authors>knah, BepInEx et al.</Authors>
+    <PackageId>EnoPM.Il2CppInterop.Generator</PackageId>
     <Description>Library for generating assemblies and metadata for calling Il2Cpp functions from .NET</Description>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Il2CppInterop.Generator</RootNamespace>
