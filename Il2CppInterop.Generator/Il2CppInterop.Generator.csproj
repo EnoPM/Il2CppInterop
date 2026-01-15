@@ -11,18 +11,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <MonoModBackportsSolution>D:\Projects\MonoMod.Backports</MonoModBackportsSolution>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="$(MonoModBackportsSolution)\src\MonoMod.Backports\MonoMod.Backports.csproj">
-      <Aliases>MonoModBackports</Aliases><!-- Transitive dependency from AsmResolver. Extern alias prevents it from affecting us. -->
-    </ProjectReference>
-  </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="AsmResolver.DotNet" Version="6.0.0-beta.2" />
+    <PackageReference Include="MonoMod.Backports" Version="1.1.2">
+      <Aliases>MonoModBackports</Aliases><!-- Transitive dependency from AsmResolver. Extern alias prevents it from affecting us. -->
+    </PackageReference>
     <PackageReference Include="PolySharp" Version="1.15.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
