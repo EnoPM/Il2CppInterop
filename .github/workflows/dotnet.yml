@@ -23,7 +23,7 @@ jobs:
           global-json-file: global.json
 
       - name: Authenticate to GitHub Packages
-        run: sed -i 's|%GITHUB_TOKEN%|${{ secrets.GITHUB_TOKEN }}|g' nuget.config
+        run: sed -i 's|%GITHUB_TOKEN%|${{ secrets.GH_PACKAGES_TOKEN }}|g' nuget.config
 
       - name: Extract Release Version
         id: get_version
