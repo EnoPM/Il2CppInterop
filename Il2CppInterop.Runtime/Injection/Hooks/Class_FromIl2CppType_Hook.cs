@@ -27,10 +27,42 @@ namespace Il2CppInterop.Runtime.Injection.Hooks
 
         private Il2CppClass* Hook(Il2CppType* type, bool throwOnError)
         {
+            // Handle injected non-generic classes
             if ((nint)type->data < 0 && (type->type == Il2CppTypeEnum.IL2CPP_TYPE_CLASS || type->type == Il2CppTypeEnum.IL2CPP_TYPE_VALUETYPE))
             {
                 InjectorHelpers.s_InjectedClasses.TryGetValue((nint)type->data, out var classPointer);
                 return (Il2CppClass*)classPointer;
+            }
+
+            // Handle injected generic instantiations
+            if (type->type == Il2CppTypeEnum.IL2CPP_TYPE_GENERICINST)
+            {
+                var genericClass = (Il2CppGenericClass*)type->data;
+
+                // Check if this references an injected generic definition (negative index)
+                if (genericClass->typeDefinitionIndex < 0 &&
+                    ClassInjector._injectedGenericIndexToType.TryGetValue(genericClass->typeDefinitionIndex, out var genericDefType))
+                {
+                    // Check if we have a cached class
+                    if (genericClass->cached_class != null)
+                        return genericClass->cached_class;
+
+                    // Try to build the closed type from the type arguments
+                    var typeArgs = new Type[genericClass->context.class_inst->type_argc];
+                    for (int i = 0; i < typeArgs.Length; i++)
+                    {
+                        var argType = genericClass->context.class_inst->type_argv[i];
+                        typeArgs[i] = ClassInjector.SystemTypeFromIl2CppType(argType);
+                    }
+
+                    var closedType = genericDefType.MakeGenericType(typeArgs);
+                    var result = ClassInjector.InstantiateInjectedGeneric(closedType);
+                    if (result != IntPtr.Zero)
+                    {
+                        genericClass->cached_class = (Il2CppClass*)result;
+                        return (Il2CppClass*)result;
+                    }
+                }
             }
 
             return Original(type, throwOnError);

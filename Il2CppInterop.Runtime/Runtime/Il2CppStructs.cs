@@ -292,6 +292,33 @@ public unsafe struct Il2CppGenericMethod
     public Il2CppGenericContext context;
 }
 
+/// <summary>
+/// Represents a generic parameter in IL2CPP (T, U, etc.)
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct Il2CppGenericParameter
+{
+    public int ownerIndex;          // Index of the owner (class or method) in metadata
+    public byte* name;              // Name of the parameter (e.g., "T")
+    public short constraintsStart;  // Start index of constraints in metadata
+    public short constraintsCount;  // Number of constraints
+    public ushort num;              // Position of the parameter (0 for T, 1 for U, etc.)
+    public ushort flags;            // Generic parameter attributes
+}
+
+/// <summary>
+/// Represents a container for generic parameters in IL2CPP.
+/// This is used for generic type definitions and generic method definitions.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct Il2CppGenericContainer
+{
+    public int ownerIndex;          // Index of the owner (class or method) in metadata
+    public int type_argc;           // Number of type parameters
+    public int is_method;           // 1 if this is for a method, 0 for a type
+    public int genericParameterStart; // Start index of generic parameters in metadata
+}
+
 public unsafe struct Il2CppReflectionMethod
 {
     public Il2CppObject _object;
