@@ -90,7 +90,7 @@ public static unsafe partial class ClassInjector
     public static IntPtr DerivedConstructorPointer<T>()
     {
         return IL2CPP.il2cpp_object_new(Il2CppClassPointerStore<T>
-            .NativeClassPtr); // todo: consider calling base constructor
+            .NativeClassPtr);
     }
 
     public static void DerivedConstructorBody(Il2CppObjectBase objectBase)
@@ -109,6 +109,64 @@ public static unsafe partial class ClassInjector
             );
         var ownGcHandle = GCHandle.Alloc(objectBase, GCHandleType.Normal);
         AssignGcHandle(objectBase.Pointer, ownGcHandle);
+    }
+
+    /// <summary>
+    /// Calls the parameterless constructor (.ctor) of the IL2CPP base class.
+    /// This is necessary when inheriting from IL2CPP classes that need initialization
+    /// (e.g., List&lt;T&gt;, Dictionary&lt;K,V&gt;, etc.)
+    /// </summary>
+    /// <param name="objectBase">The object instance to initialize</param>
+    /// <param name="baseType">The IL2CPP base type whose constructor should be called</param>
+    public static void CallBaseClassConstructor(Il2CppObjectBase objectBase, Type baseType)
+    {
+        CallBaseClassConstructor(objectBase, baseType, Array.Empty<Type>(), Array.Empty<IntPtr>());
+    }
+
+    /// <summary>
+    /// Calls a constructor of the IL2CPP base class with the specified arguments.
+    /// </summary>
+    /// <param name="objectBase">The object instance to initialize</param>
+    /// <param name="baseType">The IL2CPP base type whose constructor should be called</param>
+    /// <param name="parameterTypes">The types of the constructor parameters</param>
+    /// <param name="parameterValues">The values to pass to the constructor (as IL2CPP pointers)</param>
+    public static void CallBaseClassConstructor(Il2CppObjectBase objectBase, Type baseType, Type[] parameterTypes, IntPtr[] parameterValues)
+    {
+        IntPtr baseClassPtr = Il2CppClassPointerStore.GetNativeClassPointer(baseType);
+        if (baseClassPtr == IntPtr.Zero)
+        {
+            // Try to resolve as a closed generic type
+            if (baseType.IsGenericType && !baseType.IsGenericTypeDefinition)
+            {
+                var resolved = ResolveIl2CppClass(baseType);
+                if (resolved != null)
+                    baseClassPtr = resolved.Pointer;
+            }
+        }
+
+        if (baseClassPtr == IntPtr.Zero)
+            throw new ArgumentException($"Could not find IL2CPP class for base type {baseType}");
+
+        // Find the .ctor method with the matching parameter count
+        IntPtr ctorMethod = IL2CPP.il2cpp_class_get_method_from_name(baseClassPtr, ".ctor", parameterTypes.Length);
+        if (ctorMethod == IntPtr.Zero)
+            throw new ArgumentException($"Could not find .ctor with {parameterTypes.Length} parameters on {baseType}");
+
+        // Call the constructor
+        IntPtr exception = IntPtr.Zero;
+        if (parameterValues.Length == 0)
+        {
+            IL2CPP.il2cpp_runtime_invoke(ctorMethod, objectBase.Pointer, (void**)IntPtr.Zero, ref exception);
+        }
+        else
+        {
+            fixed (IntPtr* argsPtr = parameterValues)
+            {
+                IL2CPP.il2cpp_runtime_invoke(ctorMethod, objectBase.Pointer, (void**)argsPtr, ref exception);
+            }
+        }
+
+        Il2CppException.RaiseExceptionIfNecessary(exception);
     }
 
     public static void AssignGcHandle(IntPtr pointer, GCHandle gcHandle)
@@ -131,7 +189,41 @@ public static unsafe partial class ClassInjector
             return true;
         if (IsManagedTypeInjected(type)) return true;
 
+        // For closed generic types, try to resolve via IL2CPP
+        if (type.IsGenericType && !type.IsGenericTypeDefinition)
+        {
+            var resolved = ResolveIl2CppClass(type);
+            if (resolved != null)
+                return true;
+        }
+
         return false;
+    }
+
+    /// <summary>
+    /// Resolves an IL2CPP class pointer for a closed generic type (e.g., List&lt;int&gt;).
+    /// Returns IntPtr.Zero if the type cannot be resolved.
+    /// </summary>
+    /// <typeparam name="T">The closed generic type to resolve</typeparam>
+    /// <returns>The IL2CPP class pointer, or IntPtr.Zero if not found</returns>
+    public static IntPtr GetIl2CppClassPointerForClosedGenericType<T>()
+    {
+        return GetIl2CppClassPointerForClosedGenericType(typeof(T));
+    }
+
+    /// <summary>
+    /// Resolves an IL2CPP class pointer for a closed generic type (e.g., List&lt;int&gt;).
+    /// Returns IntPtr.Zero if the type cannot be resolved.
+    /// </summary>
+    /// <param name="closedGenericType">The closed generic type to resolve</param>
+    /// <returns>The IL2CPP class pointer, or IntPtr.Zero if not found</returns>
+    public static IntPtr GetIl2CppClassPointerForClosedGenericType(Type closedGenericType)
+    {
+        if (!closedGenericType.IsGenericType || closedGenericType.IsGenericTypeDefinition)
+            throw new ArgumentException($"Type {closedGenericType} is not a closed generic type");
+
+        var resolved = ResolveIl2CppClass(closedGenericType);
+        return resolved?.Pointer ?? IntPtr.Zero;
     }
 
     internal static bool IsManagedTypeInjected(Type type)
@@ -173,8 +265,9 @@ public static unsafe partial class ClassInjector
         if (type == null)
             throw new ArgumentException("Type argument cannot be null");
 
-        if (type.IsGenericType || type.IsGenericTypeDefinition)
-            throw new ArgumentException($"Type {type} is generic and can't be used in il2cpp");
+        // Allow closed generic types, but not open generic type definitions
+        if (type.IsGenericTypeDefinition)
+            throw new ArgumentException($"Type {type} is an open generic type definition and can't be used in il2cpp. Use a closed generic type instead (e.g., MyClass<int> instead of MyClass<>)");
 
         var currentPointer = Il2CppClassPointerStore.GetNativeClassPointer(type);
         if (currentPointer != IntPtr.Zero)
@@ -184,14 +277,19 @@ public static unsafe partial class ClassInjector
         if (baseType == null)
             throw new ArgumentException($"Class {type} does not inherit from a class registered in il2cpp");
 
-        var baseClassPointer =
-            UnityVersionHandler.Wrap((Il2CppClass*)Il2CppClassPointerStore.GetNativeClassPointer(baseType));
+        INativeClassStruct baseClassPointer = ResolveIl2CppClass(baseType);
         if (baseClassPointer == null)
         {
+            // If base type is a closed generic, we can't register it - it must exist in IL2CPP
+            if (baseType.IsGenericType && !baseType.IsGenericTypeDefinition)
+                throw new ArgumentException($"Base class {baseType} is a closed generic type that doesn't exist in IL2CPP");
+
             RegisterTypeInIl2Cpp(baseType, new RegisterTypeOptions { LogSuccess = options.LogSuccess });
-            baseClassPointer =
-                UnityVersionHandler.Wrap((Il2CppClass*)Il2CppClassPointerStore.GetNativeClassPointer(baseType));
+            baseClassPointer = ResolveIl2CppClass(baseType);
         }
+
+        if (baseClassPointer == null)
+            throw new ArgumentException($"Could not resolve IL2CPP class for base type {baseType}");
 
         InjectorHelpers.Setup();
 
@@ -201,8 +299,8 @@ public static unsafe partial class ClassInjector
         if (baseClassPointer.ValueType || baseClassPointer.EnumType)
             throw new ArgumentException($"Base class {baseType} is value type and can't be inherited from");
 
-        if (baseClassPointer.IsGeneric)
-            throw new ArgumentException($"Base class {baseType} is generic and can't be inherited from");
+        // Note: We now allow inheriting from inflated generic classes (e.g., List<int>)
+        // IsGeneric is true for generic type definitions, not for inflated types
 
         if ((baseClassPointer.Flags & Il2CppClassAttributes.TYPE_ATTRIBUTE_SEALED) != 0)
             throw new ArgumentException($"Base class {baseType} is sealed and can't be inherited from");
@@ -525,6 +623,111 @@ public static unsafe partial class ClassInjector
 
         if (options.LogSuccess)
             Logger.Instance.LogInformation("Registered mono type {Type} in il2cpp domain", type);
+    }
+
+    /// <summary>
+    /// Resolves an IL2CPP class pointer for the given managed type.
+    /// Supports both regular types and closed generic types (e.g., List&lt;int&gt;).
+    /// </summary>
+    private static INativeClassStruct ResolveIl2CppClass(Type type)
+    {
+        // First, try the simple path - check if we already have a pointer stored
+        var storedPointer = Il2CppClassPointerStore.GetNativeClassPointer(type);
+        if (storedPointer != IntPtr.Zero)
+            return UnityVersionHandler.Wrap((Il2CppClass*)storedPointer);
+
+        // For closed generic types, we need to resolve via IL2CPP's type system
+        if (type.IsGenericType && !type.IsGenericTypeDefinition)
+        {
+            return ResolveClosedGenericClass(type);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Resolves an IL2CPP class for a closed generic type (e.g., List&lt;int&gt;).
+    /// This works by constructing the Il2CppType for the generic instantiation and
+    /// using il2cpp_class_from_il2cpp_type to get the class.
+    /// </summary>
+    private static INativeClassStruct ResolveClosedGenericClass(Type closedGenericType)
+    {
+        if (!closedGenericType.IsGenericType || closedGenericType.IsGenericTypeDefinition)
+            return null;
+
+        // Get the generic type definition's IL2CPP class
+        Type genericDefinition = closedGenericType.GetGenericTypeDefinition();
+        IntPtr genericDefClassPtr = Il2CppClassPointerStore.GetNativeClassPointer(genericDefinition);
+        if (genericDefClassPtr == IntPtr.Zero)
+            return null;
+
+        var genericDefClass = UnityVersionHandler.Wrap((Il2CppClass*)genericDefClassPtr);
+        if (!genericDefClass.IsGeneric)
+            return null;
+
+        // Get the type arguments
+        Type[] typeArguments = closedGenericType.GetGenericArguments();
+
+        // Allocate Il2CppGenericInst structure
+        var genericInst = (Il2CppGenericInst*)Marshal.AllocHGlobal(sizeof(Il2CppGenericInst));
+        genericInst->type_argc = (uint)typeArguments.Length;
+        genericInst->type_argv = (Il2CppTypeStruct**)Marshal.AllocHGlobal(typeArguments.Length * IntPtr.Size);
+
+        // Fill in the type arguments
+        for (int i = 0; i < typeArguments.Length; i++)
+        {
+            IntPtr argClassPtr = Il2CppClassPointerStore.GetNativeClassPointer(typeArguments[i]);
+            if (argClassPtr == IntPtr.Zero)
+            {
+                // Try to resolve nested generic types recursively
+                if (typeArguments[i].IsGenericType && !typeArguments[i].IsGenericTypeDefinition)
+                {
+                    var nestedClass = ResolveClosedGenericClass(typeArguments[i]);
+                    if (nestedClass != null)
+                        argClassPtr = nestedClass.Pointer;
+                }
+
+                if (argClassPtr == IntPtr.Zero)
+                {
+                    // Cleanup and return null if we can't resolve a type argument
+                    Marshal.FreeHGlobal((IntPtr)genericInst->type_argv);
+                    Marshal.FreeHGlobal((IntPtr)genericInst);
+                    return null;
+                }
+            }
+
+            genericInst->type_argv[i] = (Il2CppTypeStruct*)IL2CPP.il2cpp_class_get_type(argClassPtr);
+        }
+
+        // Create the Il2CppGenericClass structure
+        var genericClass = (Il2CppGenericClass*)Marshal.AllocHGlobal(sizeof(Il2CppGenericClass));
+        genericClass->typeDefinitionIndex = -1; // We don't have a real index, use -1 for inflated types
+        genericClass->context.class_inst = genericInst;
+        genericClass->context.method_inst = null;
+        genericClass->cached_class = null;
+
+        // Create the Il2CppType for GENERICINST
+        var inflatedType = UnityVersionHandler.NewType();
+        inflatedType.Type = Il2CppTypeEnum.IL2CPP_TYPE_GENERICINST;
+        inflatedType.Data = (IntPtr)genericClass;
+
+        // Use IL2CPP to resolve the class from the type
+        IntPtr resolvedClassPtr = IL2CPP.il2cpp_class_from_il2cpp_type(inflatedType.Pointer);
+        if (resolvedClassPtr == IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal((IntPtr)genericClass);
+            Marshal.FreeHGlobal((IntPtr)genericInst->type_argv);
+            Marshal.FreeHGlobal((IntPtr)genericInst);
+            return null;
+        }
+
+        // Cache the result for future lookups
+        Il2CppClassPointerStore.SetNativeClassPointer(closedGenericType, resolvedClassPtr);
+
+        // Update the cached_class in genericClass
+        genericClass->cached_class = (Il2CppClass*)resolvedClassPtr;
+
+        return UnityVersionHandler.Wrap((Il2CppClass*)resolvedClassPtr);
     }
 
     private static bool IsTypeSupported(Type type)

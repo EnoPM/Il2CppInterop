@@ -142,6 +142,7 @@ namespace Il2CppInterop.Runtime.Runtime.VersionSpecific.Class
             public ref Il2CppClass** ImplementedInterfaces => ref _->implementedInterfaces;
             public ref Il2CppRuntimeInterfaceOffsetPair* InterfaceOffsets => ref _->interfaceOffsets;
             public ref Il2CppClass** TypeHierarchy => ref _->typeHierarchy;
+            public ref Il2CppGenericClass* GenericClass => ref *(Il2CppGenericClass**)&_->generic_class;
             public bool ValueType
             {
                 get => this.CheckBit(_bitfield0offset, (int)Il2CppClass_22_0.Bitfield0.BIT_valuetype);

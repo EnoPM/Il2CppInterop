@@ -52,4 +52,6 @@ public interface INativeClassStruct : INativeStruct
     unsafe ref Il2CppClass** ImplementedInterfaces { get; }
     unsafe ref Il2CppRuntimeInterfaceOffsetPair* InterfaceOffsets { get; }
     unsafe ref Il2CppClass** TypeHierarchy { get; }
+
+    unsafe ref Il2CppGenericClass* GenericClass { get; }
 }
